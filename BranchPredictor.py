@@ -1166,8 +1166,8 @@ class GshareBP(BranchPredictor):
 
     global_predictor_size = Param.Unsigned(512, "Size of global predictor")
     global_counter_bits = Param.Unsigned(2, "Bits per counter")
-class GshareBP(BranchPredictor):
-    type = "GshareBP"
+class YAGSBP(BranchPredictor):
+    type = "YAGSBP"
     cxx_class = "gem5::branch_prediction::YAGSBP"
     cxx_header = "cpu/pred/yags.hh"
 

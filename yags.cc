@@ -16,7 +16,11 @@ YAGSBP::YAGSBP(const YAGSBPParams &params)
       globalHistoryBits(ceilLog2(params.global_predictor_size)),
       globalPredictorSize(params.global_predictor_size),
       globalCtrBits(params.global_counter_bits),
-      globalCtrs(globalPredictorSize, SatCounter8(globalCtrBits))
+      globalCtrs(globalPredictorSize, SatCounter8(globalCtrBits)),
+      Tcache(globalPredictorSize, SatCounter8(globalCtrBits)),
+      Tcache_tag(globalPredictorSize, SatCounter8(globalCtrBits)),
+      NTcache(globalPredictorSize, SatCounter8(globalCtrBits)),
+      NTcache_tag(globalPredictorSize, SatCounter8(globalCtrBits))
 {
 
     if (!isPowerOf2(globalPredictorSize)) {
@@ -86,7 +90,7 @@ YAGSBP::lookup(ThreadID tid, Addr branchAddr, void *&bp_history)
     bool TCacheHit = Tcache_tag[globalHistoryIdx] == patternHistoryIdx;
     bool NTCacheHit = NTcache_tag[globalHistoryIdx] == patternHistoryIdx;
     
-    bool final_prediction = PHTprediction ? (~NTCacheHit & PHTprediction) | (NTCacheHit &  NTCacheprediction): (~TCacheHit & PHTprediction) | (TCacheHit &  TCacheprediction);
+    bool final_prediction = PHTprediction ? (!NTCacheHit & PHTprediction) | (NTCacheHit &  NTCacheprediction): (!TCacheHit & PHTprediction) | (TCacheHit &  TCacheprediction);
     
     BPHistory *history = new BPHistory;
     history->globalHistoryReg = globalHistoryReg[tid];
@@ -128,19 +132,19 @@ YAGSBP::update(ThreadID tid, Addr branchAddr, bool taken, void *&bp_history,
     bool TCacheHit = Tcache_tag[globalHistoryIdx] == patternHistoryIdx;
     bool NTCacheHit = NTcache_tag[globalHistoryIdx] == patternHistoryIdx;
     
-    if(NTCacheHit || (~taken & PHTprediction)){
+    if(NTCacheHit || (!taken & PHTprediction)){
         NTcache[globalHistoryIdx]++;
     }else if (NTCacheHit || (taken & PHTprediction)){
         NTcache[globalHistoryIdx]--;
-    } else if (~NTCacheHit & PHTprediction){
+    } else if (!NTCacheHit & PHTprediction){
         NTcache_tag[globalHistoryIdx] = patternHistoryIdx;
     }
     
-    if(TCacheHit || (~taken & PHTprediction)){
+    if(TCacheHit || (!taken & PHTprediction)){
         Tcache[globalHistoryIdx]++;
     }else if (TCacheHit || (taken & PHTprediction)){
         Tcache[globalHistoryIdx]--;
-    } else if (~TCacheHit & PHTprediction){
+    } else if (!TCacheHit & PHTprediction){
         Tcache_tag[globalHistoryIdx] = patternHistoryIdx;
     }
     
