@@ -20,7 +20,7 @@ namespace branch_prediction
  * taken and not taken counters.
  */
 
-class YAGSBP : public BPredUnit
+class YAGSBP : public ConditionalPredictor
 {
   public:
     YAGSBP(const YAGSBPParams &params);

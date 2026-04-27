@@ -246,8 +246,8 @@ for proc in processor.start:
 
 for core in processor._switchable_cores["switch"]:
     bp = BranchPredictor()
-    bp.conditionalBranchPred =  YAGSBP(
-    globalPredictorSize = 4096) ## <--- You can use any other branch predictor class here.
+    bp.conditionalBranchPred =  YAGSBP(global_predictor_size=8192) ## <--- You can use any other branch predictor class here.
+    
     core.core.branchPred = bp
 
 

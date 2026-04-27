@@ -11,7 +11,7 @@ namespace branch_prediction
 {
 
 YAGSBP::YAGSBP(const YAGSBPParams &params)
-    : BPredUnit(params),
+    : ConditionalPredictor(params),
       globalHistoryReg(params.numThreads, 0),
       globalHistoryBits(ceilLog2(params.global_predictor_size)),
       globalPredictorSize(params.global_predictor_size),
@@ -84,11 +84,11 @@ YAGSBP::lookup(ThreadID tid, Addr branchAddr, void *&bp_history)
     assert(globalHistoryIdx < globalPredictorSize);
     //assert(patternHistoryIdx < globalPredictorSize);
     
-    bool PHTprediction = globalCtrs[patternHistoryIdx] > takenThreshold;
-    bool NTCacheprediction = NTcache[globalHistoryIdx] > takenNTCacheThreshold;
-    bool TCacheprediction = Tcache[globalHistoryIdx] > takenTCacheThreshold;
-    bool TCacheHit = Tcache_tag[globalHistoryIdx] == patternHistoryIdx;
-    bool NTCacheHit = NTcache_tag[globalHistoryIdx] == patternHistoryIdx;
+    bool PHTprediction = globalCtrs[patternHistoryIdx%globalPredictorSize] > takenThreshold;
+    bool NTCacheprediction = NTcache[globalHistoryIdx%globalPredictorSize] > takenNTCacheThreshold;
+    bool TCacheprediction = Tcache[globalHistoryIdx%globalPredictorSize] > takenTCacheThreshold;
+    bool TCacheHit = Tcache_tag[globalHistoryIdx%globalPredictorSize] == patternHistoryIdx;
+    bool NTCacheHit = NTcache_tag[globalHistoryIdx%globalPredictorSize] == patternHistoryIdx;
     
     bool final_prediction = PHTprediction ? (!NTCacheHit & PHTprediction) | (NTCacheHit &  NTCacheprediction): (!TCacheHit & PHTprediction) | (TCacheHit &  TCacheprediction);
     
@@ -126,32 +126,32 @@ YAGSBP::update(ThreadID tid, Addr branchAddr, bool taken, void *&bp_history,
     
     assert(globalHistoryIdx < globalPredictorSize);
     unsigned patternHistoryIdx =( branchAddr >> instShiftAmt);
-    bool PHTprediction = globalCtrs[patternHistoryIdx] > takenThreshold;
-    bool NTCacheprediction = NTcache[globalHistoryIdx] > takenNTCacheThreshold;
-    bool TCacheprediction = Tcache[globalHistoryIdx] > takenTCacheThreshold;
-    bool TCacheHit = Tcache_tag[globalHistoryIdx] == patternHistoryIdx;
-    bool NTCacheHit = NTcache_tag[globalHistoryIdx] == patternHistoryIdx;
+    bool PHTprediction = globalCtrs[patternHistoryIdx%globalPredictorSize] > takenThreshold;
+    bool NTCacheprediction = NTcache[globalHistoryIdx%globalPredictorSize] > takenNTCacheThreshold;
+    bool TCacheprediction = Tcache[globalHistoryIdx%globalPredictorSize] > takenTCacheThreshold;
+    bool TCacheHit = Tcache_tag[globalHistoryIdx%globalPredictorSize] == patternHistoryIdx;
+    bool NTCacheHit = NTcache_tag[globalHistoryIdx%globalPredictorSize] == patternHistoryIdx;
     
     if(NTCacheHit || (!taken & PHTprediction)){
-        NTcache[globalHistoryIdx]++;
+        NTcache[globalHistoryIdx%globalPredictorSize]++;
     }else if (NTCacheHit || (taken & PHTprediction)){
-        NTcache[globalHistoryIdx]--;
+        NTcache[globalHistoryIdx%globalPredictorSize]--;
     } else if (!NTCacheHit & PHTprediction){
-        NTcache_tag[globalHistoryIdx] = patternHistoryIdx;
+        NTcache_tag[globalHistoryIdx%globalPredictorSize] = patternHistoryIdx;
     }
     
     if(TCacheHit || (!taken & PHTprediction)){
-        Tcache[globalHistoryIdx]++;
+        Tcache[globalHistoryIdx%globalPredictorSize]++;
     }else if (TCacheHit || (taken & PHTprediction)){
-        Tcache[globalHistoryIdx]--;
+        Tcache[globalHistoryIdx%globalPredictorSize]--;
     } else if (!TCacheHit & PHTprediction){
-        Tcache_tag[globalHistoryIdx] = patternHistoryIdx;
+        Tcache_tag[globalHistoryIdx%globalPredictorSize] = patternHistoryIdx;
     }
     
     if (taken) {
-        globalCtrs[patternHistoryIdx]++;
+        globalCtrs[patternHistoryIdx%globalPredictorSize]++;
     } else {
-        globalCtrs[patternHistoryIdx]--;
+        globalCtrs[patternHistoryIdx%globalPredictorSize]--;
     }
     delete history;
     bp_history = nullptr;
