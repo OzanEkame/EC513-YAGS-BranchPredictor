@@ -9,7 +9,7 @@
 ---
 ## Report & Presentation
 
-- [Final Report (PDF)](EC513_YAGS_Report.pdf)
+- [Final Report (PDF)](EC513 YAGS project report - Brian Quijada, Fadi Kidess, Ozan Ekame Pekgoz, Will Borland.pdf)
 - [Presentation Slides (PDF)](YAGS_Presentation.pdf)
 ---
 
