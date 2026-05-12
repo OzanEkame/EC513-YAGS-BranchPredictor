@@ -1,80 +1,111 @@
-# EC513 — YAGS Branch Predictor Implementation in gem5
+# YAGS Branch Predictor Implementation in gem5
 
-**Course:** EC513 Computer Architecture, Spring 2026  
-**Instructor:** Ajay Joshi  
-**Team:** Ozan Ekame, William Borland, Brian Quijada, Fadi Kidess
+**EC 513 — Computer Architecture | Boston University | Spring 2026**  
+**Authors:** Brian Quijada, Fadi Kidess, Ozan Ekame Pekgoz, Will Borland  
+**Instructor:** Prof. Ajay Joshi
+
+> Based on: A. N. Eden and T. Mudge, "The YAGS Branch Prediction Scheme," in *Proceedings of the 31st Annual ACM/IEEE International Symposium on Microarchitecture (MICRO-31)*, Dec. 1998, pp. 69–77.
+
+---
 
 ## Overview
 
-This project implements the **YAGS (Yet Another Global Scheme)** branch predictor in gem5 (v25.1). YAGS is a hybrid predictor that reduces destructive aliasing in global branch predictors by maintaining separate "taken" and "not-taken" caches that store only the exceptions to a biased prediction. This allows the predictor to handle branches with strong biases efficiently while still capturing branches that deviate from their expected behavior.
+Branch prediction is critical for modern out-of-order processors — stalling the pipeline until a branch resolves would severely hurt performance. The central problem with global branch predictors is **PHT aliasing**: two different branches mapping to the same Pattern History Table entry. When aliasing is destructive (the two branches have conflicting histories), mispredictions follow.
 
-## Branch Predictor Description
+YAGS (Yet Another Global Scheme) addresses this by splitting prediction into two components:
 
-YAGS builds on the observation that most branches are heavily biased toward either taken or not-taken. Instead of storing predictions for all branches in a single global table (which causes aliasing), YAGS uses:
+- **Choice PHT** — a standard bimodal predictor indexed by `PC XOR global history`. Captures each branch's dominant bias (mostly taken or mostly not-taken).
+- **Tagged direction caches** — two small caches (one for taken exceptions, one for not-taken exceptions) that store only the cases where a branch defies its dominant bias. Each entry holds a tag from the LSBs of the branch address, virtually eliminating aliasing between consecutive branches.
 
-- A **direction cache** (choice predictor) indexed by branch address, which provides a biased prediction (taken or not-taken)
-- A **T-cache** (taken cache) that stores branches whose actual outcome contradicts a "not-taken" bias
-- An **NT-cache** (not-taken cache) that stores branches whose actual outcome contradicts a "taken" bias
-- Tags in each cache to reduce aliasing
+**Prediction flow (example: branch biased toward taken):**
+1. Consult choice PHT → predicts taken
+2. Check not-taken cache for a tag match
+3. Cache hit → use cache prediction (this is an exception to the bias)
+4. Cache miss → use choice PHT prediction (bias holds)
 
-By only caching the exceptions, YAGS significantly reduces the number of entries needed and minimizes conflicts between branches.
+This design reduces aliasing in two ways: the choice PHT handles strongly biased branches cleanly, and the tagged direction caches prevent different branches from corrupting each other's exception entries.
 
-## Repository Structure
+---
 
-```
-├── src/cpu/pred/          # YAGS implementation files
-│   ├── yags.cc            # YAGS predictor implementation
-│   ├── yags.hh            # YAGS predictor header
-│   └── BranchPredictor.py # SimObject configuration (updated)
-├── configs/               # Simulation configuration scripts
-├── output/                # Experimental results and stats
-└── README.md
-```
+## Implementation
 
-## Benchmarks
+YAGS is implemented as a new `BPredUnit` subclass in gem5, alongside existing predictors such as `BiModeBP` and `TournamentBP`.
 
-Evaluated on 5 SPEC CPU2017 benchmarks:
+**Key files:**
+- `src/yags.hh` — class declaration, data structure definitions
+- `src/yags.cc` — prediction logic, update logic, cache lookup and writeback
 
-| Benchmark | Description |
-|-----------|-------------|
-| 505.mcf_r | Network flow optimization |
-| 520.omnetpp_r | Discrete event simulation |
-| 523.xalancbmk_r | XML processing |
-| 502.gcc_r | GNU C compiler |
+**Data structures:**
+
+| Structure | Type | Size |
+|---|---|---|
+| Choice PHT | Vector of 2-bit saturating counters | 8192 entries |
+| Taken cache | Vector of `{tag, 2-bit counter, valid}` | 8192 entries |
+| Not-taken cache | Vector of `{tag, 2-bit counter, valid}` | 8192 entries |
+| Tags | 13-bit LSBs of branch PC | — |
+
+**Implementation notes:**
+- Branch PC is shifted by `instShiftAmt` before indexing to account for 4-byte alignment (without this, the 2 LSBs are always zero and 75% of cache entries would be unused)
+- Cache indexing uses modulo to prevent out-of-bounds access — an initial segmentation fault was caused by address overflow before this was added
+- Tag width and cache depth are parameterizable via `BranchPredictor.py`
+
+---
+
+## Evaluation
+
+Simulations were run in gem5 using the O3CPU model on five SPEC CPU 2017 benchmarks, compared against five existing gem5 predictors.
+
+**Benchmarks:**
+
+| Benchmark | Workload Type |
+|---|---|
+| 505.mcf_r | Route planning, integer arithmetic |
+| 520.omnetpp_r | Network simulation, unpredictable branches |
+| 523.xalancbmk_r | XML to HTML conversion, more predictable |
+| 502.gcc_r | C compiler, complex control flow |
 | 525.x264_r | Video compression |
 
-**Simulation parameters:** 1 billion instruction warmup, 1 billion instruction measurement phase.
+**Misprediction Rate (%) — lower is better:**
 
-## Comparison
+| Predictor | 505.mcf_r | 520.omnetpp_r | 523.xalancbmk_r | 502.gcc_r | 525.x264_r |
+|---|---|---|---|---|---|
+| **YAGS** | **6.5%** | **6.47%** | **6.46%** | **5.35%** | **5.33%** |
+| mpp8kb | 6.4% | 6.4% | 6.5% | 6.4% | 6.4% |
+| gshare | 6.5% | 6.5% | 6.5% | 6.5% | 6.5% |
+| tournament | 4.6% | 4.5% | 4.6% | 4.6% | 4.6% |
+| tage | 3.1% | 3.1% | 3.1% | 3.1% | 3.1% |
+| localBP | 5.5% | 5.6% | 5.6% | 5.5% | 5.6% |
 
-YAGS is compared against the following predictors from HW5:
+**IPC — higher is better:**
 
-- TournamentBP
-- LTAGE
-- MultiperspectivePerceptronTAGE64KB
+| Predictor | 505.mcf_r | 520.omnetpp_r | 523.xalancbmk_r | 502.gcc_r | 525.x264_r |
+|---|---|---|---|---|---|
+| **YAGS** | **0.363** | **0.363** | **0.363** | **0.363** | **0.361** |
+| mpp8kb | 0.484 | 0.484 | 0.484 | 0.484 | 0.484 |
+| gshare | 0.481 | 0.482 | 0.482 | 0.481 | 0.482 |
+| tournament | 0.493 | 0.493 | 0.492 | 0.492 | 0.492 |
+| tage | 0.501 | 0.501 | 0.501 | 0.501 | 0.501 |
+| local | 0.488 | 0.489 | 0.489 | 0.488 | 0.489 |
 
-Metrics reported: **IPC** (instructions per cycle) and **branch misprediction rate**.
+YAGS misprediction rates are consistent with the paper's reported ~6% at comparable cache sizes. The IPC results did not behave as expected — values below 1.0 on an O3CPU and near-identical numbers across benchmarks indicate an issue with the simulation setup, likely in the CPU core switch logic after warmup. This is discussed in the report.
 
-## How to Run
+---
 
-```bash
-# Source the SPEC environment
-source /projectnb/ec513/materials/HW2/spec-2017/sourceme
+## Known Limitations
 
-# Navigate to gem5 directory
-cd /path/to/gem5
+- Simulations used 1 billion warmup instructions instead of the intended 5 billion due to time constraints on BU's SCC cluster. Insufficient warmup likely contributed to the IPC anomaly.
+- The CPU core switch after warmup may not have been correctly configured, possibly causing warmup-phase results to be recorded instead of measurement-phase results.
+- Future work: sweep tag width and direction cache size ratio; validate core switch logic; rerun with full 5B warmup.
 
-# Build gem5
-scons build/X86/gem5.opt -j$(nproc)
+---
 
-# Run a benchmark with YAGS predictor
-build/X86/gem5.opt configs/run_YAGS.py \
-    --image ../disk-image/spec-2017/spec-2017-image/spec-2017 \
-    --partition 1 \
-    --benchmark 505.mcf_r \
-    --size ref
-```
+## Report & Presentation
 
-## References
+- [Final Report (PDF)](report/EC513_YAGS_Report.pdf)
+- [Presentation Slides (PDF)](report/YAGS_Presentation.pdf)
 
-- Eden, A. N., & Mudge, T. (1998). *The YAGS Branch Prediction Scheme.* MICRO-31.
+---
+
+## Reference
+
+A. N. Eden and T. Mudge, "The YAGS Branch Prediction Scheme," in *Proceedings of the 31st Annual ACM/IEEE International Symposium on Microarchitecture*, Dec. 1998, pp. 69–77. doi: 10.1109/MICRO.1998.742770.
