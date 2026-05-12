@@ -7,6 +7,12 @@
 > Based on: A. N. Eden and T. Mudge, "The YAGS Branch Prediction Scheme," in *Proceedings of the 31st Annual ACM/IEEE International Symposium on Microarchitecture (MICRO-31)*, Dec. 1998, pp. 69–77.
 
 ---
+## Report & Presentation
+
+- [Final Report (PDF)](report/EC513_YAGS_project_report_-_Brian_Quijada,_Fadi_Kidess,_Ozan_Ekame_Pekgoz,_Will_Borland.pdf)
+- [Presentation Slides (PDF)](report/YAGS_Presentation.pdf)
+
+---
 
 ## Overview
 
@@ -97,14 +103,7 @@ YAGS misprediction rates are consistent with the paper's reported ~6% at compara
 - The CPU core switch after warmup may not have been correctly configured, possibly causing warmup-phase results to be recorded instead of measurement-phase results.
 - Future work: sweep tag width and direction cache size ratio; validate core switch logic; rerun with full 5B warmup.
 
----
-
-## Report & Presentation
-
-- [Final Report (PDF)](report/EC513_YAGS_Report.pdf)
-- [Presentation Slides (PDF)](report/YAGS_Presentation.pdf)
-
----
+--
 
 ## Reference
 
