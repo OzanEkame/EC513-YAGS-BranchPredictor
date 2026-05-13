@@ -7,11 +7,6 @@
 > Based on: A. N. Eden and T. Mudge, "The YAGS Branch Prediction Scheme," in *Proceedings of the 31st Annual ACM/IEEE International Symposium on Microarchitecture (MICRO-31)*, Dec. 1998, pp. 69–77.
 
 ---
-## Report & Presentation
-
-- [Final Report (PDF)](EC513 YAGS project report - Brian Quijada, Fadi Kidess, Ozan Ekame Pekgoz, Will Borland.pdf)
-- [Presentation Slides (PDF)](YAGS_Presentation.pdf)
----
 
 ## Overview
 
